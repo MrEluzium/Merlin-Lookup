@@ -9,6 +9,8 @@ import aiofiles
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
+from chardet import UniversalDetector
+
 from utils.config_parser import read_config
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -98,9 +100,19 @@ def remove_cache():
 
 async def extract_paragraphs_from_fb2(file_path):
     """Asynchronously extract paragraphs from an FB2 file."""
-    enc = 'latin-1' if platform == 'linux' else 'utf-8'
-    async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
-        content = await file.read()
+    try:
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+            content = await file.read()
+    except UnicodeDecodeError:
+        print(f"{file_path} could not be read with utf-8. Encoding auto detection...")
+        detector = UniversalDetector()
+        for line in open(file_path, 'rb'):
+            detector.feed(line)
+            if detector.done: break
+        detector.close()
+        print(f"Auto-detected encoding for {file_path}: {detector.result['encoding']}")
+        async with aiofiles.open(file_path, 'r', encoding=detector.result['encoding']) as file:
+            content = await file.read()
 
     tree = ET.ElementTree(ET.fromstring(content))
     root = tree.getroot()
