@@ -12,67 +12,78 @@ from utils.config_parser import read_config
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CACHE_DIR = os.path.join(PROJECT_ROOT, '.cache')
 
+# Global lock to prevent simultaneous access to file extraction and release
+FILE_LOCK = asyncio.Lock()
+
 file_reference_counter = {}
 
 
-def get_fb2_file(zip_file_name: str, fb2_file_name: str) -> str:
+async def async_unzip(zip_file_path: str, fb2_file_name: str, target_path: str) -> None:
+    """
+    Extracts a fb2 file from the zip archive asynchronously.
+    """
+    def unzip():
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            if fb2_file_name not in zip_ref.namelist():
+                raise FileNotFoundError(f"{fb2_file_name} not found in archive.")
+            with zip_ref.open(fb2_file_name) as source_file, open(target_path, 'wb') as target_file:
+                shutil.copyfileobj(source_file, target_file)
+
+    await asyncio.to_thread(unzip)
+
+
+async def get_fb2_file(zip_file_name: str, fb2_file_name: str) -> str:
     """
     Extracts the specified .fb2 file if not already extracted and increments its reference counter.
     Returns the path to the .fb2 file.
     """
     os.makedirs(CACHE_DIR, exist_ok=True)
-
-
     target_path = os.path.join(CACHE_DIR, fb2_file_name)
 
-    if fb2_file_name in file_reference_counter:
-        file_reference_counter[fb2_file_name] += 1
-        print(f"File {fb2_file_name} is already extracted. Reference count: {file_reference_counter[fb2_file_name]}")
-        return target_path
+    async with FILE_LOCK:
+        if fb2_file_name in file_reference_counter:
+            file_reference_counter[fb2_file_name] += 1
+            print(
+                f"File {fb2_file_name} is already extracted. Reference count: {file_reference_counter[fb2_file_name]}")
+            return target_path
 
     library_dir = read_config('config.ini')['Library']['library_root']
     zip_file_path = os.path.join(library_dir, zip_file_name)
     if not os.path.isfile(zip_file_path):
         raise FileNotFoundError(f"The file {zip_file_path} does not exist.")
 
-    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-        fb2_files = [file for file in zip_ref.namelist() if file.endswith('.fb2')]
+    await async_unzip(zip_file_path, fb2_file_name, target_path)
 
-        if not fb2_files:
-            raise FileNotFoundError("No .fb2 files found in the archive.")
+    async with FILE_LOCK:
+        file_reference_counter[fb2_file_name] = 1
+        print(f"Extracted {fb2_file_name} to {CACHE_DIR}. Reference count: 1")
 
-        if fb2_file_name not in fb2_files:
-            raise FileNotFoundError(f"The file {fb2_file_name} was not found in the archive.")
-
-        with zip_ref.open(fb2_file_name) as source_file, open(target_path, 'wb') as target_file:
-            target_file.write(source_file.read())
-
-    file_reference_counter[fb2_file_name] = 1
-    print(f"Extracted {fb2_file_name} to {CACHE_DIR}. Reference count: 1")
     return target_path
 
 
-def release_fb2_file(fb2_file_name: str) -> None:
+async def release_fb2_file(fb2_file_name: str) -> None:
     """
     Decrements the reference counter for the specified .fb2 file.
     Deletes the file if the reference count reaches zero.
     """
-    if fb2_file_name not in file_reference_counter:
-        print(f"File {fb2_file_name} is not being tracked.")
-        return
+    async with FILE_LOCK:
+        if fb2_file_name not in file_reference_counter:
+            print(f"File {fb2_file_name} is not being tracked.")
+            return
 
-    file_reference_counter[fb2_file_name] -= 1
-    print(f"Decremented reference count for {fb2_file_name}. Reference count: {file_reference_counter[fb2_file_name]}")
+        file_reference_counter[fb2_file_name] -= 1
+        print(
+            f"Decremented reference count for {fb2_file_name}. Reference count: {file_reference_counter[fb2_file_name]}")
 
-    if file_reference_counter[fb2_file_name] == 0:
-        del file_reference_counter[fb2_file_name]
-        target_path = os.path.join(CACHE_DIR, fb2_file_name)
+        if file_reference_counter[fb2_file_name] == 0:
+            del file_reference_counter[fb2_file_name]
+            target_path = os.path.join(CACHE_DIR, fb2_file_name)
 
-        if os.path.isfile(target_path):
-            os.remove(target_path)
-            print(f"File {fb2_file_name} deleted from {CACHE_DIR}.")
-        else:
-            print(f"File {fb2_file_name} not found in {CACHE_DIR}.")
+            if os.path.isfile(target_path):
+                os.remove(target_path)
+                print(f"File {fb2_file_name} deleted from {CACHE_DIR}.")
+            else:
+                print(f"File {fb2_file_name} not found in {CACHE_DIR}.")
 
 
 def remove_cache():
@@ -153,11 +164,11 @@ async def find_best_fragment(preprocessed, words, min_length=2500, max_length=30
 async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list) -> str:
     start_time = datetime.now()
 
-    text_file = get_fb2_file(zip_file_name, fb2_file_name)
+    text_file = await get_fb2_file(zip_file_name, fb2_file_name)
     paragraphs = await extract_paragraphs_from_fb2(text_file)
     preprocessed = await preprocess_paragraphs(paragraphs, words)
     fragment, total_count = await find_best_fragment(preprocessed, words)
-    release_fb2_file(fb2_file_name)
+    await release_fb2_file(fb2_file_name)
 
     print(f"Best count: {total_count}")
     with open(os.path.join(CACHE_DIR, 'last.txt'), "w", encoding="utf-8") as file:
