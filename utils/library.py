@@ -115,16 +115,15 @@ async def preprocess_paragraphs(paragraphs, words):
 
 
 async def find_best_fragment(preprocessed, words, min_length=2500, max_length=3096):
-    """Find the best fragment based on word occurrences."""
+    """Find the best fragment based on word occurrences and a preference for multiple words."""
     best_fragment = []
     best_total_count = 0
-    best_fragment_length = 0
 
-    # Sliding window approach
     for start_idx in range(len(preprocessed)):
         fragment = []
         fragment_length = 0
         fragment_count = {word: 0 for word in words}
+        words_found = set()
 
         for idx in range(start_idx, len(preprocessed)):
             paragraph_data = preprocessed[idx]
@@ -134,16 +133,19 @@ async def find_best_fragment(preprocessed, words, min_length=2500, max_length=30
             fragment.append(paragraph_data["text"])
             fragment_length += paragraph_data["length"]
 
-            # Aggregate counts
             for word in words:
                 fragment_count[word] += paragraph_data["counts"][word]
+                if paragraph_data["counts"][word] > 0:
+                    words_found.add(word)
 
-        # Check if this fragment is the best so far
         total_count = sum(fragment_count.values())
-        if total_count > best_total_count and min_length <= fragment_length <= max_length:
+        bonus_score = len(words_found) == len(words)
+
+        final_score = total_count + (10 if bonus_score else 0)
+
+        if final_score > best_total_count and min_length <= fragment_length <= max_length:
             best_fragment = fragment
-            best_total_count = total_count
-            best_fragment_length = fragment_length
+            best_total_count = final_score
 
     return "\n\n".join(best_fragment), best_total_count
 
