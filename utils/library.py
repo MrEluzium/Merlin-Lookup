@@ -3,6 +3,8 @@ import re
 import shutil
 import zipfile
 import asyncio
+from sys import platform
+
 import aiofiles
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -96,7 +98,8 @@ def remove_cache():
 
 async def extract_paragraphs_from_fb2(file_path):
     """Asynchronously extract paragraphs from an FB2 file."""
-    async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+    enc = 'latin-1' if platform == 'linux' else 'utf-8'
+    async with aiofiles.open(file_path, 'r', encoding=enc) as file:
         content = await file.read()
 
     tree = ET.ElementTree(ET.fromstring(content))
