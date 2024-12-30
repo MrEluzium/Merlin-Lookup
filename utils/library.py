@@ -9,7 +9,6 @@ from utils.config_parser import read_config
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CACHE_DIR = os.path.join(PROJECT_ROOT, '.cache')
-LIBRARY_DIR = read_config('config.ini')['Library']['library_root']
 
 file_reference_counter = {}
 
@@ -29,7 +28,8 @@ def get_fb2_file(zip_file_name: str, fb2_file_name: str) -> str:
         print(f"File {fb2_file_name} is already extracted. Reference count: {file_reference_counter[fb2_file_name]}")
         return target_path
 
-    zip_file_path = os.path.join(LIBRARY_DIR, zip_file_name)
+    library_dir = read_config('config.ini')['Library']['library_root']
+    zip_file_path = os.path.join(library_dir, zip_file_name)
     if not os.path.isfile(zip_file_path):
         raise FileNotFoundError(f"The file {zip_file_path} does not exist.")
 
