@@ -98,7 +98,7 @@ async def process_words(message: Message, state: FSMContext) -> None:
     if not search:
         await state.clear()
         await message.answer(
-            l18n.get("ru", "messages", "fragment", "not_found").format(
+            l18n.get("ru", "messages", "fragment", "book_not_found").format(
                 title=data["title"],
                 author=data["author"]
             ),
@@ -111,15 +111,25 @@ async def process_words(message: Message, state: FSMContext) -> None:
         fragment = await library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
 
         await state.clear()
-        await message.answer(
-            l18n.get("ru", "messages", "fragment", "fragment").format(
-                title=book.title,
-                author=book.author,
-                words_query=data["words"],
-                fragment=fragment
-            ),
-            reply_markup=MENU_KEYBOARD
-        )
+        if not fragment:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "fragment_not_found").format(
+                    title=book.title,
+                    author=book.author,
+                    words_query=data["words"]
+                ),
+                reply_markup=MENU_KEYBOARD
+            )
+        else:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "fragment").format(
+                    title=book.title,
+                    author=book.author,
+                    words_query=data["words"],
+                    fragment=fragment
+                ),
+                reply_markup=MENU_KEYBOARD
+            )
     else:
         builder = InlineKeyboardBuilder()
         builder.adjust()
@@ -145,11 +155,23 @@ async def choose_book(callback: CallbackQuery, callback_data: BookCallbackFactor
     fragment = await library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
 
     await state.clear()
-    await callback.message.edit_text(
-        l18n.get("ru", "messages", "fragment", "fragment").format(
-            title=book.title,
-            author=book.author,
-            words_query=data["words"],
-            fragment=fragment
+
+    if not fragment:
+        await callback.message.edit_text(
+            l18n.get("ru", "messages", "fragment", "fragment_not_found").format(
+                title=book.title,
+                author=book.author,
+                words_query=data["words"]
+            ),
+            reply_markup=MENU_KEYBOARD
         )
-    )
+    else:
+        await callback.message.edit_text(
+            l18n.get("ru", "messages", "fragment", "fragment").format(
+                title=book.title,
+                author=book.author,
+                words_query=data["words"],
+                fragment=fragment
+            ),
+            reply_markup=MENU_KEYBOARD
+        )

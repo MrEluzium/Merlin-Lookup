@@ -7,7 +7,8 @@ ru:
       specify_words_query: "Введите три существительных через пробел. Например: Дом душа любовь"
       processing: "<i>Ищем отрывок...</i>"
       fragment: "<b>{author}. {title}.</b>\nОтрывок для слов: {words_query}.\n\n<blockquote>{fragment}</blockquote>\nБольше возможностей для изучения получайте в нашем приложении. Скачивайте на сайте merlin.su или в <a href=\"https://www.rustore.ru/catalog/app/com.nexaecommerce.merlin\">Rustore</a>"
-      not_found: "У нас нет книги {title} автора {author}"
+      fragment_not_found: "Не получилось найти отрывок для слов {words_query} в книге {title} автора {author}."
+      book_not_found: "У нас нет книги {title} автора {author}"
       low_accuracy : "У нас нет книги {title} автора {author}. Выберете другую?"
   buttons:
     cancel: "В меню"
