@@ -2,6 +2,8 @@ import os
 import re
 import shutil
 import zipfile
+import asyncio
+import aiofiles
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
@@ -81,21 +83,12 @@ def remove_cache():
         print(f"{CACHE_DIR} does not exist.")
 
 
-def extract_text_from_fb2(file_path):
-    tree = ET.parse(file_path)
-    root = tree.getroot()
+async def extract_paragraphs_from_fb2(file_path):
+    """Asynchronously extract paragraphs from an FB2 file."""
+    async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+        content = await file.read()
 
-    namespaces = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
-    paragraphs = root.findall('.//fb:body//fb:p', namespaces)
-
-    text = ""
-    for para in paragraphs:
-        text += para.text or ""
-    return text
-
-
-def extract_paragraphs_from_fb2(file_path):
-    tree = ET.parse(file_path)
+    tree = ET.ElementTree(ET.fromstring(content))
     root = tree.getroot()
 
     namespaces = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
@@ -104,23 +97,24 @@ def extract_paragraphs_from_fb2(file_path):
     return [para.text.strip() for para in paragraphs if para.text]
 
 
-def count_word_occurrences(text, word_patterns):
-    return {word: len(re.findall(pattern, text)) for word, pattern in word_patterns.items()}
+async def preprocess_paragraph(paragraph, word_patterns):
+    """Preprocess a single paragraph asynchronously by counting occurrences of target words."""
+    counts = {word: len(re.findall(pattern, paragraph)) for word, pattern in word_patterns.items()}
+    return {"text": paragraph, "length": len(paragraph), "counts": counts}
 
 
-def preprocess_paragraphs(paragraphs, words):
-    """Preprocess paragraphs by counting occurrences of target words."""
+async def preprocess_paragraphs(paragraphs, words):
+    """Preprocess paragraphs asynchronously."""
     word_patterns = {word: re.compile(rf'\b{word}\b', re.IGNORECASE) for word in words}
-    preprocessed = []
 
+    tasks = []
     for paragraph in paragraphs:
-        counts = {word: len(re.findall(pattern, paragraph)) for word, pattern in word_patterns.items()}
-        preprocessed.append({"text": paragraph, "length": len(paragraph), "counts": counts})
+        tasks.append(preprocess_paragraph(paragraph, word_patterns))
 
-    return preprocessed
+    return await asyncio.gather(*tasks)
 
 
-def find_best_fragment(preprocessed, words, min_length=2500, max_length=3096):
+async def find_best_fragment(preprocessed, words, min_length=2500, max_length=3096):
     """Find the best fragment based on word occurrences."""
     best_fragment = []
     best_total_count = 0
@@ -154,13 +148,13 @@ def find_best_fragment(preprocessed, words, min_length=2500, max_length=3096):
     return "\n\n".join(best_fragment), best_total_count
 
 
-def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list) -> str:
+async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list) -> str:
     start_time = datetime.now()
 
     text_file = get_fb2_file(zip_file_name, fb2_file_name)
-    paragraphs = extract_paragraphs_from_fb2(text_file)
-    preprocessed = preprocess_paragraphs(paragraphs, words)
-    fragment, total_count = find_best_fragment(preprocessed, words)
+    paragraphs = await extract_paragraphs_from_fb2(text_file)
+    preprocessed = await preprocess_paragraphs(paragraphs, words)
+    fragment, total_count = await find_best_fragment(preprocessed, words)
     release_fb2_file(fb2_file_name)
 
     print(f"Best count: {total_count}")

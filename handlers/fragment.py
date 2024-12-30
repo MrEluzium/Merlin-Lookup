@@ -1,3 +1,5 @@
+import asyncio
+
 from aiogram import Router, F
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
@@ -106,7 +108,7 @@ async def process_words(message: Message, state: FSMContext) -> None:
 
     if search[0].accurate_enough():
         book = search[0]
-        fragment = library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
+        fragment = await library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
 
         await state.clear()
         await message.answer(
@@ -140,7 +142,7 @@ async def process_words(message: Message, state: FSMContext) -> None:
 async def choose_book(callback: CallbackQuery, callback_data: BookCallbackFactory, state: FSMContext) -> None:
     data = await state.get_data()
     book = get_book_by_id(callback_data.id)
-    fragment = library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
+    fragment = await library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
 
     await state.clear()
     await callback.message.edit_text(
