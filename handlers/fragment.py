@@ -161,8 +161,7 @@ async def choose_book(callback: CallbackQuery, callback_data: BookCallbackFactor
                 title=book.title,
                 author=book.author,
                 words_query=data["words"]
-            ),
-            reply_markup=MENU_KEYBOARD
+            )
         )
     else:
         translated_fragment = await translate_text(fragment, data["words"].split(' '))
@@ -172,6 +171,5 @@ async def choose_book(callback: CallbackQuery, callback_data: BookCallbackFactor
                 author=book.author,
                 words_query=data["words"],
                 fragment=translated_fragment
-            ),
-            reply_markup=MENU_KEYBOARD
+            )
         )
