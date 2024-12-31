@@ -1,5 +1,3 @@
-import asyncio
-
 from aiogram import Router, F
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
@@ -10,6 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
 from utils.l18n import l18n
+from utils.translate import translate_text
 from utils.database import search_books, get_book_by_id
 from handlers.start import command_start_handler
 
@@ -121,12 +120,13 @@ async def process_words(message: Message, state: FSMContext) -> None:
                 reply_markup=MENU_KEYBOARD
             )
         else:
+            translated_fragment = await translate_text(fragment, data["words"].split(' '))
             await message.answer(
                 l18n.get("ru", "messages", "fragment", "fragment").format(
                     title=book.title,
                     author=book.author,
                     words_query=data["words"],
-                    fragment=fragment
+                    fragment=translated_fragment
                 ),
                 reply_markup=MENU_KEYBOARD
             )
@@ -155,7 +155,6 @@ async def choose_book(callback: CallbackQuery, callback_data: BookCallbackFactor
     fragment = await library.process_fragment_search(book.archive, book.filename, data["words"].split(' '))
 
     await state.clear()
-
     if not fragment:
         await callback.message.edit_text(
             l18n.get("ru", "messages", "fragment", "fragment_not_found").format(
@@ -166,12 +165,13 @@ async def choose_book(callback: CallbackQuery, callback_data: BookCallbackFactor
             reply_markup=MENU_KEYBOARD
         )
     else:
+        translated_fragment = await translate_text(fragment, data["words"].split(' '))
         await callback.message.edit_text(
             l18n.get("ru", "messages", "fragment", "fragment").format(
                 title=book.title,
                 author=book.author,
                 words_query=data["words"],
-                fragment=fragment
+                fragment=translated_fragment
             ),
             reply_markup=MENU_KEYBOARD
         )
