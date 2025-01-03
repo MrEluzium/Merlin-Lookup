@@ -245,7 +245,7 @@ async def process_title(message: Message, state: FSMContext) -> None:
         builder.adjust()
         builder.row(InlineKeyboardButton(
             text=l18n.get("ru", "buttons", "start_again"),
-            callback_data="fragment_start")
+            callback_data="ask_author")
         )
         builder.row(InlineKeyboardButton(
             text=l18n.get("ru", "buttons", "cancel"),
