@@ -185,7 +185,6 @@ async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words:
     fragment, total_count = await find_best_fragment(preprocessed, words)
     await release_fb2_file(fb2_file_name)
 
-    # print(f"Best count: {total_count}")
     with open(os.path.join(CACHE_DIR, 'last.txt'), "w", encoding="utf-8") as file:
         file.write(fragment)
     print('Fragment search processed in {}'.format(datetime.now() - start_time))

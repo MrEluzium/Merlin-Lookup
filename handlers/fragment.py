@@ -5,7 +5,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, \
-    CallbackQuery, InlineKeyboardMarkup
+    CallbackQuery, InlineKeyboardMarkup, LinkPreviewOptions
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
@@ -251,16 +251,25 @@ async def process_title(message: Message, state: FSMContext) -> None:
             text=l18n.get("ru", "buttons", "cancel"),
             callback_data="cancel")
         )
-        await message.answer(
-            l18n.get("ru", "messages", "fragment", "book_not_found").format(
-                author=data["author"],
-                title=message.text
-            ),
-            reply_markup=builder.as_markup()
-        )
+
+        if data["author"]:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "book_not_found").format(
+                    author=data["author"],
+                    title=message.text
+                ),
+                reply_markup=builder.as_markup()
+            )
+        else:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "book_not_found_title").format(
+                    title=message.text
+                ),
+                reply_markup=builder.as_markup()
+            )
         return
 
-    if search[0].accurate_enough():
+    if len(search) == 1:
         await state.update_data(title=search[0].title)
         await state.update_data(book_id=search[0].id)
         await message.answer(
@@ -284,10 +293,14 @@ async def process_title(message: Message, state: FSMContext) -> None:
                 callback_data=BookCallbackFactory(id=book.id).pack()
             ))
 
+        if data["author"]:
+            query = data["author"] + ' - ' + message.text
+        else:
+            query = message.text
+
         await message.answer(
             l18n.get("ru", "messages", "fragment", "low_accuracy").format(
-                title=message.text,
-                author=data["author"]
+                query=query
             ),
             reply_markup=builder.as_markup()
         )
@@ -366,7 +379,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
     if data["book_id"]:
         book = await get_book_by_id(data["book_id"])
     else:
-        raise Exception(f"iD is not specified by the time to get fragment.")
+        raise Exception(f"ID is not specified by the time to get fragment.")
 
     if not book:
         await state.clear()
@@ -400,5 +413,6 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 words_query=', '.join(data["words"]),
                 fragment=translated_fragment
             ),
-            reply_markup=MENU_KEYBOARD
+            reply_markup=MENU_KEYBOARD,
+            link_preview_options=LinkPreviewOptions(is_disabled=True)
         )
