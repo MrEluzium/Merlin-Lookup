@@ -52,8 +52,8 @@ async def cancel_callback(callback_query: CallbackQuery, state: FSMContext):
 @fragment_router.message(F.text.casefold() == l18n.get("ru", "buttons", "cancel").casefold())
 async def cancel_handler(message: Message, state: FSMContext) -> None:
     current_state = await state.get_state()
-    if current_state is None:
-        return
+    # if current_state is None:
+    #     return
     await state.clear()
     await command_start_handler(message)
 
