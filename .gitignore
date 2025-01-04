@@ -3,3 +3,7 @@
 .cache/
 __pycache__/
 config.ini
+
+# Semantic model directory
+model/*
+!model/note.txt

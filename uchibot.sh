@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VENV_PATH="./venv"
+VENV_PATH="./.venv"
 
 if [ -d "$VENV_PATH" ]; then
     echo "Virtual environment found. Activating..."

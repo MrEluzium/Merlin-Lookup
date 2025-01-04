@@ -1,0 +1,2 @@
+Place here a semantic model from https://rusvectores.org/ru/models/
+Tested on tayga_upos_skipgram_300_2_2019 http://vectors.nlpl.eu/repository/20/185.zip

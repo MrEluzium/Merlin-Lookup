@@ -3,7 +3,6 @@ import re
 import shutil
 import zipfile
 import asyncio
-from sys import platform
 
 import aiofiles
 import xml.etree.ElementTree as ET

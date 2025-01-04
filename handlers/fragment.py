@@ -10,7 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
 from utils.l18n import l18n
-from utils.translate import translate_text
+from utils.translate import translate_words_in_text
 from utils.database import search_books, search_authors, get_book_by_id
 from handlers.start import command_start_handler
 
@@ -405,7 +405,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
             reply_markup=MENU_KEYBOARD
         )
     else:
-        translated_fragment = await translate_text(fragment, data["words"])
+        translated_fragment = await translate_words_in_text(fragment, data["words"])
         await message.answer(
             l18n.get("ru", "messages", "fragment", "fragment").format(
                 title=book.title,
