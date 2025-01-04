@@ -139,12 +139,16 @@ async def preprocess_paragraphs(paragraphs, words):
     return await asyncio.gather(*tasks)
 
 
-async def find_best_fragment(preprocessed, words, min_length=1096, max_length=2096):
-    """Find the best fragment based on word occurrences and a preference for multiple words."""
+async def find_best_fragment(preprocessed, words, min_length=2096, max_length=3096):
+    """Find the best fragment starting from a paragraph containing target words."""
     best_fragment = []
     best_total_count = 0
 
     for start_idx in range(len(preprocessed)):
+        # Skip paragraphs that do not contain any target words
+        if not any(preprocessed[start_idx]["counts"][word] > 0 for word in words):
+            continue
+
         fragment = []
         fragment_length = 0
         fragment_count = {word: 0 for word in words}
