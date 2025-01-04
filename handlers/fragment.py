@@ -202,7 +202,6 @@ async def ask_title(message: Message, state: FSMContext) -> None:
 
 @fragment_router.callback_query(F.data == "books_by_author")
 async def books_by_author_callback(callback_query: CallbackQuery, state: FSMContext) -> None:
-    await callback_query.answer()
     await state.set_state(FragmentSearchStateGroup.select_book)
     data = await state.get_data()
     search = await search_books(author_name=data["author"])
@@ -216,6 +215,7 @@ async def books_by_author_callback(callback_query: CallbackQuery, state: FSMCont
             text=f"{book.author} - {book.title}",
             callback_data=BookCallbackFactory(id=book.id).pack()
         ))
+    await callback_query.answer()
     await callback_query.message.answer(
         l18n.get("ru", "messages", "fragment", "author_book_list").format(
             author=data["author"]
@@ -308,7 +308,6 @@ async def process_title(message: Message, state: FSMContext) -> None:
 
 @fragment_router.callback_query(BookCallbackFactory.filter())
 async def choose_book_callback(callback: CallbackQuery, callback_data: BookCallbackFactory, state: FSMContext) -> None:
-    await callback.answer()
     await state.set_state(FragmentSearchStateGroup.select_book)
     book = await get_book_by_id(callback_data.id)
 
@@ -316,6 +315,7 @@ async def choose_book_callback(callback: CallbackQuery, callback_data: BookCallb
         raise Exception(f"No books found by selected ID {callback_data.id}.")
 
     await state.update_data(book_id=book.id)
+    await callback.answer()
     await callback.message.answer(
         l18n.get("ru", "messages", "fragment", "book_selected").format(
             title=book.title,
