@@ -41,12 +41,15 @@ async def translate_words_in_text(text: str, words: list[str]) -> str:
         else:
             return token
 
-        if is_upper:
-            translated_word = translated_word.upper()
-        elif is_capitalized:
-            translated_word = translated_word.capitalize()
-        elif is_lower:
-            translated_word = translated_word.lower()
+        # translated_word must be lowered, except when translation changed the case.
+        # We should keep translation letter case is it was changed
+        if not translated_word.islower():
+            if is_upper:
+                translated_word = translated_word.upper()
+            elif is_capitalized:
+                translated_word = translated_word.capitalize()
+            elif is_lower:
+                translated_word = translated_word.lower()
 
         # Reassemble token with special characters
         return re.sub(r'[a-zA-Zа-яА-ЯёЁ]+', translated_word, token)

@@ -139,13 +139,14 @@ async def preprocess_paragraphs(paragraphs, words):
     return await asyncio.gather(*tasks)
 
 
-async def find_best_fragment(preprocessed, words, min_length=2096, max_length=3096):
-    """Find the best fragment starting from a paragraph containing target words."""
+async def find_best_fragment(preprocessed, words, min_length=1096, max_length=2096):
+    """Find the best fragment starting from a paragraph containing target words, and cut paragraphs without specified words from start and end."""
     best_fragment = []
     best_total_count = 0
+    best_start_idx = 0
+    best_end_idx = 0
 
     for start_idx in range(len(preprocessed)):
-        # Skip paragraphs that do not contain any target words
         if not any(preprocessed[start_idx]["counts"][word] > 0 for word in words):
             continue
 
@@ -175,17 +176,39 @@ async def find_best_fragment(preprocessed, words, min_length=2096, max_length=30
         if final_score > best_total_count and min_length <= fragment_length <= max_length:
             best_fragment = fragment
             best_total_count = final_score
+            best_start_idx = start_idx
+            best_end_idx = idx
 
-    return "\n\n".join(best_fragment), best_total_count
+    trimmed_fragment = []
+
+    # Cut from the start
+    for i in range(best_start_idx, best_end_idx):
+        if any(preprocessed[i]["counts"][word] > 0 for word in words):
+            trimmed_fragment.append(preprocessed[i]["text"])
+
+    # Cut from the end
+    while trimmed_fragment and not any(preprocessed[best_end_idx - 1]["counts"][word] > 0 for word in words):
+        best_end_idx -= 1
+        trimmed_fragment.pop()
+
+    fragment_length = sum(len(paragraph) for paragraph in trimmed_fragment)
+
+    if fragment_length > max_length:
+        # Trim the fragment further if it's too long
+        while fragment_length > max_length and trimmed_fragment:
+            trimmed_fragment.pop()
+            fragment_length = sum(len(paragraph) for paragraph in trimmed_fragment)
+
+    return "\n\n".join(trimmed_fragment), best_total_count
 
 
-async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list) -> str:
+async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096) -> str:
     start_time = datetime.now()
 
     text_file = await get_fb2_file(zip_file_name, fb2_file_name)
     paragraphs = await extract_paragraphs_from_fb2(text_file)
     preprocessed = await preprocess_paragraphs(paragraphs, words)
-    fragment, total_count = await find_best_fragment(preprocessed, words)
+    fragment, total_count = await find_best_fragment(preprocessed, words, max_length=max_length)
     await release_fb2_file(fb2_file_name)
 
     with open(os.path.join(CACHE_DIR, 'last.txt'), "w", encoding="utf-8") as file:

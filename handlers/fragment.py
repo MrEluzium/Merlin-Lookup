@@ -392,7 +392,18 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         )
         return
 
-    fragment = await library.process_fragment_search(book.archive, book.filename, data["words"])
+    header_string = l18n.get("ru", "messages", "fragment", "fragment").format(
+                title=book.title,
+                author=book.author,
+                words_query=', '.join(data["words"]),
+                fragment=""
+    )
+    fragment = await library.process_fragment_search(
+        book.archive,
+        book.filename,
+        data["words"],
+        max_length=4049-len(header_string)
+    )
 
     await state.clear()
     if not fragment:
