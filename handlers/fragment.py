@@ -352,7 +352,7 @@ async def process_words(message: Message, state: FSMContext) -> None:
     words = message.text.split(" ")
     clean_words = []
     for word in words:
-        clean_word = re.sub(r'[^a-zA-Zа-яА-Я]', '', word)
+        clean_word = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', word)
         if clean_word.isalpha():
             clean_words.append(clean_word)
 

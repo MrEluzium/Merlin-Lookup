@@ -19,7 +19,7 @@ async def translate_words_in_text(text: str, words: list[str]) -> str:
     tokens = re.findall(r'\S+|\s+|[^\w\s]', text)
 
     async def process_token(token: str) -> str:
-        cleaned_token = re.sub(r'[^a-zA-Zа-яА-Я]', '', token)
+        cleaned_token = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', token)
 
         if not cleaned_token.isalpha():
             return token
@@ -49,7 +49,7 @@ async def translate_words_in_text(text: str, words: list[str]) -> str:
             translated_word = translated_word.lower()
 
         # Reassemble token with special characters
-        return re.sub(r'[a-zA-Zа-яА-Я]+', translated_word, token)
+        return re.sub(r'[a-zA-Zа-яА-ЯёЁ]+', translated_word, token)
 
     translated_tokens = [await process_token(token) for token in tokens]
     translated_text = ''.join(translated_tokens)
