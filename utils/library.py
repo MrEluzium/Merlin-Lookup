@@ -130,16 +130,21 @@ async def preprocess_paragraph(paragraph, word_patterns):
 
 async def preprocess_paragraphs(paragraphs, words):
     """Preprocess paragraphs asynchronously."""
-    word_patterns = {word: re.compile(rf'\b{word}\b', re.IGNORECASE) for word in words}
+    # word_patterns = {word: re.compile(rf'\b{word}\b', re.IGNORECASE) for word in words}
+    word_patterns = {word: re.compile(rf'{word}[а-яё]*', re.IGNORECASE) for word in words}
 
     tasks = []
-    for paragraph in paragraphs:
-        tasks.append(preprocess_paragraph(paragraph, word_patterns))
+    for paragraph in paragraphs[:5]:  # Первые 5 параграфов
+        print("Paragraph:", paragraph)
+        for word, pattern in word_patterns.items():
+            matches = re.findall(pattern, paragraph)
+            if matches:
+                print(f"Found {word}: {matches}")
 
     return await asyncio.gather(*tasks)
 
 
-async def find_best_fragment(preprocessed, words, min_length=1096, max_length=2096):
+async def find_best_fragment(preprocessed, words, min_length=512, max_length=2096):
     """Find the best fragment starting from a paragraph containing target words, and cut paragraphs without specified words from start and end."""
     best_fragment = []
     best_total_count = 0
