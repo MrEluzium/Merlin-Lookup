@@ -52,7 +52,8 @@ async def translate_words_in_text(text: str, words: list[str]) -> str:
                 translated_word = translated_word.lower()
 
         # Reassemble token with special characters
-        return re.sub(r'[a-zA-Zа-яА-ЯёЁ]+', translated_word, token)
+        reassembled_token = re.sub(r'[a-zA-Zа-яА-ЯёЁ]+', translated_word, token)
+        return f"<u><b>{reassembled_token}</b></u>"
 
     translated_tokens = [await process_token(token) for token in tokens]
     translated_text = ''.join(translated_tokens)
