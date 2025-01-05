@@ -32,6 +32,8 @@ class SQLFiles:
     DECREASE_PAID_TOKENS = "users/decrease_paid_tokens.sql"
     DECREASE_FREE_TOKENS = "users/decrease_free_tokens.sql"
 
+    INSERT_FRAGMENT_RECORD = "fragments/insert_fragment_record.sql"
+
     BOOKS_FUZZY_SEARCH = "library/books_fuzzy_search.sql"
     AUTHORS_FUZZY_SEARCH = "library/authors_fuzzy_search.sql"
     BOOKS_TITLE_FUZZY_SEARCH = "library/books_title_fuzzy_search.sql"
@@ -49,6 +51,7 @@ class UchibotUserData:
     paid_tokens: int = 0
     free_tokens: int = 3
     total_paid_tokens_spent: int = 0
+
 
 class SearchResultSimilarityCheck:
     def __init__(self, similarity: float):
@@ -243,6 +246,13 @@ async def user_increase_paid_tokens_spent(user: User, add_tokens: int) -> int:
     async with pool.acquire() as conn:
         sql_query = await load_sql(SQLFiles.INCREASE_PAID_TOKENS_SPENT)
         return await conn.fetchval(sql_query, user.id, add_tokens)
+
+
+@check_user
+async def add_fragment_record(user: User, book_id: int, word_list: [str], text_fragment: str) -> None:
+    async with pool.acquire() as conn:
+        sql_query = await load_sql(SQLFiles.INSERT_FRAGMENT_RECORD)
+        await conn.execute(sql_query, user.id, book_id, word_list, text_fragment)
 
 
 async def search_books(title: str = None, author_name: str = None) -> list[BookSearchResult] | None:

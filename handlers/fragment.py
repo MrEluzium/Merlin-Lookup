@@ -11,7 +11,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from utils import library
 from utils.l18n import l18n
 from utils.translate import translate_words_in_text
-from utils.database import search_books, search_authors, get_book_by_id
+from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record
 from handlers.start import command_start_handler
 
 
@@ -401,7 +401,6 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 words_query=', '.join(data["words"]),
                 fragment=""
     )
-    print("header len: ", len(header_string))
     fragment = await library.process_fragment_search(
         book.archive,
         book.filename,
@@ -421,6 +420,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         )
     else:
         translated_fragment = await translate_words_in_text(fragment, data["words"])
+        await add_fragment_record(message.from_user, book.id, data["words"], translated_fragment)
         await message.answer(
             l18n.get("ru", "messages", "fragment", "fragment").format(
                 title=book.title,

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.uchibot_fragments
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     CONSTRAINT uchibot_fragments_user_id_fkey FOREIGN KEY (user_id)
-        REFERENCES public.uchibot_users (id) MATCH SIMPLE
+        REFERENCES public.uchibot_users (user_id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE
 )
