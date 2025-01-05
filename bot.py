@@ -7,9 +7,11 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from utils import library
+from utils import database
 from utils.config_parser import *
 from handlers.fragment import fragment_router
 from handlers.start import start_router
+from handlers.profile import profile_router
 
 CONFIG_FILE = "config.ini"
 
@@ -22,10 +24,12 @@ else:
 
 
 async def main(token: str) -> None:
+    await database.init_pool()
     dp = Dispatcher()
     dp.include_routers(
         start_router,
-        fragment_router
+        fragment_router,
+        profile_router
     )
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await dp.start_polling(bot)

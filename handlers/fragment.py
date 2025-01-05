@@ -5,7 +5,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, \
-    CallbackQuery, InlineKeyboardMarkup, LinkPreviewOptions
+    CallbackQuery, LinkPreviewOptions
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
@@ -37,9 +37,12 @@ class AuthorCallbackFactory(CallbackData, prefix="author"):
 fragment_router = Router()
 CANCEL_BUTTON = KeyboardButton(text=l18n.get("ru", "buttons", "cancel"))
 MENU_KEYBOARD = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text=l18n.get("ru", "buttons", "start", "fragment_search"))]],
-    resize_keyboard=True,
-    is_persistent=True
+        keyboard=[
+            [KeyboardButton(text=l18n.get("ru", "buttons", "start", "fragment_search"))],
+            [KeyboardButton(text=l18n.get("ru", "buttons", "start", "profile"))]
+        ],
+        resize_keyboard=True,
+        is_persistent=True
 )
 
 

@@ -10,7 +10,10 @@ start_router = Router()
 @start_router.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=l18n.get("ru", "buttons", "start", "fragment_search"))]],
+        keyboard=[
+            [KeyboardButton(text=l18n.get("ru", "buttons", "start", "fragment_search"))],
+            [KeyboardButton(text=l18n.get("ru", "buttons", "start", "profile"))]
+        ],
         resize_keyboard=True,
         is_persistent=True
     )
