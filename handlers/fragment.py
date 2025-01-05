@@ -398,6 +398,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 words_query=', '.join(data["words"]),
                 fragment=""
     )
+    print("header len: ", len(header_string))
     fragment = await library.process_fragment_search(
         book.archive,
         book.filename,

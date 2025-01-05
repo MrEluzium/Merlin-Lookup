@@ -134,12 +134,8 @@ async def preprocess_paragraphs(paragraphs, words):
     word_patterns = {word: re.compile(rf'{word}[а-яё]*', re.IGNORECASE) for word in words}
 
     tasks = []
-    for paragraph in paragraphs[:5]:  # Первые 5 параграфов
-        print("Paragraph:", paragraph)
-        for word, pattern in word_patterns.items():
-            matches = re.findall(pattern, paragraph)
-            if matches:
-                print(f"Found {word}: {matches}")
+    for paragraph in paragraphs:
+        tasks.append(preprocess_paragraph(paragraph, word_patterns))
 
     return await asyncio.gather(*tasks)
 
