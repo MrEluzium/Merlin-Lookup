@@ -18,6 +18,7 @@ pool: Pool | None = None
 class SQLFiles:
     INSERT_USER = "users/insert_user.sql"
     GET_USER_BY_USER_ID = "users/get_user_by_user_id.sql"
+    GET_USER_BY_USER_NAME = "users/get_user_by_user_name.sql"
     CHECK_USER_BY_USER_ID = "users/check_user_by_user_id.sql"
     UPDATE_USERNAME = "users/update_username.sql"
 
@@ -147,6 +148,24 @@ async def get_user_data(user: User) -> UchibotUserData | None:
     return user_data
 
 
+async def get_user_by_name(username: str) -> UchibotUserData | None:
+    user_data = None
+    async with pool.acquire() as conn:
+        sql_query = await load_sql(SQLFiles.GET_USER_BY_USER_NAME)
+        user = await conn.fetchrow(sql_query, username)
+        if user:
+            user_data = UchibotUserData(
+                id=user["id"],
+                user_id=user["user_id"],
+                user_name=user["user_name"],
+                registration_date=user["registration_date"],
+                paid_tokens=user["paid_tokens"],
+                free_tokens=user["free_tokens"],
+                total_paid_tokens_spent=user["total_paid_tokens_spent"],
+            )
+    return user_data
+
+
 @check_user
 async def user_set_paid_tokens(user: User, new_tokens: int) -> None:
     """
@@ -170,6 +189,18 @@ async def user_increase_paid_tokens(user: User, add_tokens: int) -> int:
     async with pool.acquire() as conn:
         sql_query = await load_sql(SQLFiles.INCREASE_PAID_TOKENS)
         return await conn.fetchval(sql_query, user.id, add_tokens)
+
+
+async def user_increase_paid_tokens_by_id(user_id: int, add_tokens: int) -> int:
+    """
+    Increase the number of paid tokens of user.
+    :param user_id: ID of user to process
+    :param add_tokens: Tokens to add
+    :return: Number of paid tokens after increase
+    """
+    async with pool.acquire() as conn:
+        sql_query = await load_sql(SQLFiles.INCREASE_PAID_TOKENS)
+        return await conn.fetchval(sql_query, user_id, add_tokens)
 
 
 @check_user

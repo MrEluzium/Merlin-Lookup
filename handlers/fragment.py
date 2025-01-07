@@ -10,9 +10,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
 from utils.l18n import l18n
+from utils.keyboards import get_menu_keyboard, CANCEL_BUTTON
 from utils.translate import translate_words_in_text
 from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record
-from handlers.start import command_start_handler
 
 
 class FragmentSearchStateGroup(StatesGroup):
@@ -35,30 +35,6 @@ class AuthorCallbackFactory(CallbackData, prefix="author"):
 
 
 fragment_router = Router()
-CANCEL_BUTTON = KeyboardButton(text=l18n.get("ru", "buttons", "cancel"))
-MENU_KEYBOARD = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=l18n.get("ru", "buttons", "start", "fragment_search"))],
-            [KeyboardButton(text=l18n.get("ru", "buttons", "start", "profile"))]
-        ],
-        resize_keyboard=True,
-        is_persistent=True
-)
-
-
-@fragment_router.callback_query(F.data == "cancel")
-async def cancel_callback(callback_query: CallbackQuery, state: FSMContext):
-    await callback_query.answer()
-    await cancel_handler(callback_query.message, state)
-
-
-@fragment_router.message(F.text.casefold() == l18n.get("ru", "buttons", "cancel").casefold())
-async def cancel_handler(message: Message, state: FSMContext) -> None:
-    current_state = await state.get_state()
-    # if current_state is None:
-    #     return
-    await state.clear()
-    await command_start_handler(message)
 
 
 @fragment_router.message(F.text.casefold() == l18n.get("ru", "buttons", "start", "fragment_search").casefold())
@@ -359,7 +335,7 @@ async def process_words(message: Message, state: FSMContext) -> None:
         if clean_word.isalpha():
             clean_words.append(clean_word)
 
-    if len(clean_words) != 3:
+    if len(clean_words) not in range(1, 4):
         await message.answer(
             l18n.get("ru", "messages", "fragment", "words_wrong_format"),
             reply_markup=ReplyKeyboardRemove()
@@ -391,7 +367,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 title=data["title"],
                 author=data["author"]
             ),
-            reply_markup=MENU_KEYBOARD
+            reply_markup=get_menu_keyboard(message.from_user.username)
         )
         return
 
@@ -405,7 +381,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         book.archive,
         book.filename,
         data["words"],
-        max_length=4049-len(header_string)
+        max_length=3549-len(header_string)
     )
 
     await state.clear()
@@ -416,7 +392,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 author=book.author,
                 words_query=', '.join(data["words"])
             ),
-            reply_markup=MENU_KEYBOARD
+            reply_markup=get_menu_keyboard(message.from_user.username)
         )
     else:
         translated_fragment = await translate_words_in_text(fragment, data["words"])
@@ -428,6 +404,6 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 words_query=', '.join(data["words"]),
                 fragment=translated_fragment
             ),
-            reply_markup=MENU_KEYBOARD,
+            reply_markup=get_menu_keyboard(message.from_user.username),
             link_preview_options=LinkPreviewOptions(is_disabled=True)
         )

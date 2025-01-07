@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.uchibot_fragments
     book_id integer NOT NULL,
     word_list text[] COLLATE pg_catalog."default" NOT NULL,
     text_fragment text COLLATE pg_catalog."default" NOT NULL,
+    created_at timestamp without time zone DEFAULT now(),
     CONSTRAINT uchibot_fragments_pkey PRIMARY KEY (id),
     CONSTRAINT unique_user_book_words UNIQUE (user_id, book_id, word_list),
     CONSTRAINT uchibot_fragments_book_id_fkey FOREIGN KEY (book_id)
