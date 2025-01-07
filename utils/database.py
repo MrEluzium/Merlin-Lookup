@@ -40,6 +40,7 @@ class SQLFiles:
     BOOKS_TITLE_FUZZY_SEARCH = "library/books_title_fuzzy_search.sql"
 
     SELECT_BOOK_BY_ID = "library/select_book_by_id.sql"
+    SELECT_BOOK_BY_URL = "library/select_book_by_url.sql"
     SELECT_BOOKS_BY_AUTHOR = "library/select_books_by_author.sql"
 
 
@@ -342,6 +343,13 @@ async def get_book_by_id(book_id: int) -> BookSearchResult:
     async with pool.acquire() as conn:
         sql_query = await load_sql(SQLFiles.SELECT_BOOK_BY_ID)
         row = await conn.fetchrow(sql_query, book_id)
+    return BookSearchResult(*row, 1)
+
+
+async def get_book_by_url(url: str) -> BookSearchResult:
+    async with pool.acquire() as conn:
+        sql_query = await load_sql(SQLFiles.SELECT_BOOK_BY_URL)
+        row = await conn.fetchrow(sql_query, url)
     return BookSearchResult(*row, 1)
 
 

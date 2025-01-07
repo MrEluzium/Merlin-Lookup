@@ -3,6 +3,7 @@ import re
 import shutil
 import zipfile
 import asyncio
+from pathlib import Path
 
 import aiofiles
 import xml.etree.ElementTree as ET
@@ -11,6 +12,7 @@ from datetime import datetime
 from chardet import UniversalDetector
 
 from utils.config_parser import read_config
+from utils.database import BookSearchResult, get_book_by_url
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CACHE_DIR = os.path.join(PROJECT_ROOT, '.cache')
@@ -19,6 +21,19 @@ CACHE_DIR = os.path.join(PROJECT_ROOT, '.cache')
 FILE_LOCK = asyncio.Lock()
 
 file_reference_counter = {}
+
+
+async def yield_zip_file_names(folder_path: str) -> (str, str):
+    """Yields file names from ZIP archives in a folder one by one."""
+    folder = Path(folder_path)
+    for file in folder.iterdir():
+        if file.suffix == '.zip' and file.is_file():
+            try:
+                with zipfile.ZipFile(file, 'r') as archive:
+                    for name in archive.namelist():
+                        yield file.name, name
+            except zipfile.BadZipFile:
+                print(f"Error: {file.name} is not a valid ZIP file.")
 
 
 async def async_unzip(zip_file_path: str, fb2_file_name: str, target_path: str) -> None:
@@ -130,8 +145,10 @@ async def preprocess_paragraph(paragraph, word_patterns):
 
 async def preprocess_paragraphs(paragraphs, words):
     """Preprocess paragraphs asynchronously."""
-    # word_patterns = {word: re.compile(rf'\b{word}\b', re.IGNORECASE) for word in words}
-    word_patterns = {word: re.compile(rf'{word}[а-яё]*', re.IGNORECASE) for word in words}
+    word_patterns = {
+        word: re.compile(rf'(?<![а-яёa-z]){word}(?![а-яёa-z])', re.IGNORECASE)
+        for word in words
+    }
 
     tasks = []
     for paragraph in paragraphs:
@@ -143,76 +160,63 @@ async def preprocess_paragraphs(paragraphs, words):
 async def find_best_fragment(preprocessed, words, min_length=512, max_length=2096):
     """Find the best fragment starting from a paragraph containing target words, and cut paragraphs without specified words from start and end."""
     best_fragment = []
-    best_total_count = 0
-    best_start_idx = 0
-    best_end_idx = 0
+    best_score = -1
+    best_fragment_count = {}
 
     for start_idx in range(len(preprocessed)):
-        if not any(preprocessed[start_idx]["counts"][word] > 0 for word in words):
-            continue
+        current_length = 0
+        current_fragment = []
+        current_counts = {word: 0 for word in words}
 
-        fragment = []
-        fragment_length = 0
-        fragment_count = {word: 0 for word in words}
-        words_found = set()
+        for end_idx in range(start_idx, len(preprocessed)):
+            para_data = preprocessed[end_idx]
+            new_length = current_length + para_data["length"]
 
-        for idx in range(start_idx, len(preprocessed)):
-            paragraph_data = preprocessed[idx]
-            if fragment_length + paragraph_data["length"] > max_length:
+            if new_length > max_length:
                 break
 
-            fragment.append(paragraph_data["text"])
-            fragment_length += paragraph_data["length"]
+            current_length = new_length
+            current_fragment.append(para_data)
 
             for word in words:
-                fragment_count[word] += paragraph_data["counts"][word]
-                if paragraph_data["counts"][word] > 0:
-                    words_found.add(word)
+                current_counts[word] += para_data["counts"][word]
 
-        total_count = sum(fragment_count.values())
-        bonus_score = len(words_found) == len(words)
+            if current_length >= min_length and all(current_counts[word] > 0 for word in words):
+                score = sum(current_counts.values()) - (end_idx - start_idx) * 0.1
 
-        final_score = total_count + (10 if bonus_score else 0)
+                if score > best_score:
+                    best_score = score
+                    best_fragment = current_fragment.copy()
+                    best_fragment_count = current_counts.copy()
 
-        if final_score > best_total_count and min_length <= fragment_length <= max_length:
-            best_fragment = fragment
-            best_total_count = final_score
-            best_start_idx = start_idx
-            best_end_idx = idx
+    if not best_fragment:
+        return "", {word: 0 for word in words}
 
-    trimmed_fragment = []
-
-    # Cut from the start
-    for i in range(best_start_idx, best_end_idx):
-        if any(preprocessed[i]["counts"][word] > 0 for word in words):
-            trimmed_fragment.append(preprocessed[i]["text"])
-
-    # Cut from the end
-    while trimmed_fragment and not any(preprocessed[best_end_idx - 1]["counts"][word] > 0 for word in words):
-        best_end_idx -= 1
-        trimmed_fragment.pop()
-
-    fragment_length = sum(len(paragraph) for paragraph in trimmed_fragment)
-
-    if fragment_length > max_length:
-        # Trim the fragment further if it's too long
-        while fragment_length > max_length and trimmed_fragment:
-            trimmed_fragment.pop()
-            fragment_length = sum(len(paragraph) for paragraph in trimmed_fragment)
-
-    return "\n\n".join(trimmed_fragment), best_total_count
+    return "\n\n".join(p["text"] for p in best_fragment), best_fragment_count
 
 
-async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096) -> str:
+async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096) -> tuple[str, dict[str, int]]:
     start_time = datetime.now()
 
     text_file = await get_fb2_file(zip_file_name, fb2_file_name)
     paragraphs = await extract_paragraphs_from_fb2(text_file)
     preprocessed = await preprocess_paragraphs(paragraphs, words)
-    fragment, total_count = await find_best_fragment(preprocessed, words, max_length=max_length)
+    fragment, words_found = await find_best_fragment(preprocessed, words, max_length=max_length)
     await release_fb2_file(fb2_file_name)
 
-    with open(os.path.join(CACHE_DIR, 'last.txt'), "w", encoding="utf-8") as file:
-        file.write(fragment)
     print('Fragment search processed in {}'.format(datetime.now() - start_time))
-    return fragment
+    return fragment, words_found
+
+
+async def process_full_search(words: list, max_length: int = 2096) -> tuple[str, BookSearchResult]:
+    library_dir = read_config('config.ini')['Library']['library_root']
+    async for zip_name, file_name in yield_zip_file_names(library_dir):
+        print(f'Processing {file_name} from {zip_name}...')
+        fragment, words_found = await process_fragment_search(zip_name, file_name, words, max_length=3096)
+        print(words_found)
+        if len(words_found) != len(words) or any(n < 1 for n in words_found.values()):
+            continue
+
+        url = "fb2.Flibusta.Net/" + zip_name + "/" + file_name
+        book = await get_book_by_url(url)
+        return fragment, book

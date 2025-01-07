@@ -5,7 +5,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, \
-    CallbackQuery, LinkPreviewOptions
+    CallbackQuery, LinkPreviewOptions, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
@@ -13,7 +13,7 @@ from utils.l18n import l18n
 from utils.keyboards import get_menu_keyboard, CANCEL_BUTTON
 from utils.translate import translate_words_in_text
 from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record, get_user_data, \
-    user_decrease_free_tokens, user_decrease_paid_tokens, user_increase_paid_tokens_spent
+    user_decrease_free_tokens, user_decrease_paid_tokens, user_increase_paid_tokens_spent, BookSearchResult
 
 
 class FragmentSearchStateGroup(StatesGroup):
@@ -40,7 +40,25 @@ fragment_router = Router()
 
 @fragment_router.message(F.text.casefold() == l18n.get("ru", "buttons", "start", "fragment_search").casefold())
 async def fragment_handler(message: Message, state: FSMContext) -> None:
-    await ask_author(message, state)
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text=l18n.get("ru", "buttons", "book_search"),
+        callback_data="ask_author")
+    )
+    builder.row(InlineKeyboardButton(
+        text=l18n.get("ru", "buttons", "full_search"),
+        callback_data="full_search")
+    )
+    await message.answer(
+        text=l18n.get("ru", "messages", "fragment", "search_options"),
+        reply_markup=builder.as_markup()
+    )
+
+
+@fragment_router.callback_query(F.data == "full_search")
+async def full_search_callback(callback_query: CallbackQuery, state: FSMContext) -> None:
+    await state.update_data(full_search=True)
+    await ask_words(callback_query.message, state)
 
 
 @fragment_router.callback_query(F.data == "ask_author")
@@ -51,6 +69,7 @@ async def ask_author_callback(callback_query: CallbackQuery, state: FSMContext) 
 
 async def ask_author(message: Message, state: FSMContext) -> None:
     await state.set_state(FragmentSearchStateGroup.ask_author)
+    await state.update_data(full_search=False)
     await message.answer(
         l18n.get("ru", "messages", "fragment", "specify_author"),
         reply_markup=ReplyKeyboardMarkup(
@@ -372,36 +391,40 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         l18n.get("ru", "messages", "fragment", "fragment_processing"),
         reply_markup=ReplyKeyboardRemove()
     )
+    fragment = ''
 
     data = await state.get_data()
-    if data["book_id"]:
-        book = await get_book_by_id(data["book_id"])
+    if data["full_search"]:
+        fragment, book = await library.process_full_search(data["words"], max_length=3096)
     else:
-        raise Exception(f"ID is not specified by the time to get fragment.")
+        if data["book_id"]:
+            book = await get_book_by_id(data["book_id"])
+        else:
+            raise Exception(f"ID is not specified by the time to get fragment.")
 
-    if not book:
-        await state.clear()
-        await message.answer(
-            l18n.get("ru", "messages", "fragment", "book_not_found").format(
-                title=data["title"],
-                author=data["author"]
-            ),
-            reply_markup=get_menu_keyboard(message.from_user.username)
+        if not book:
+            await state.clear()
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "book_not_found").format(
+                    title=data["title"],
+                    author=data["author"]
+                ),
+                reply_markup=get_menu_keyboard(message.from_user.username)
+            )
+            return
+
+        header_string = l18n.get("ru", "messages", "fragment", "fragment").format(
+                    title=book.title,
+                    author=book.author,
+                    words_query=', '.join(data["words"]),
+                    fragment=""
         )
-        return
-
-    header_string = l18n.get("ru", "messages", "fragment", "fragment").format(
-                title=book.title,
-                author=book.author,
-                words_query=', '.join(data["words"]),
-                fragment=""
-    )
-    fragment = await library.process_fragment_search(
-        book.archive,
-        book.filename,
-        data["words"],
-        max_length=3549-len(header_string)
-    )
+        fragment, words_found = await library.process_fragment_search(
+            book.archive,
+            book.filename,
+            data["words"],
+            max_length=3549-len(header_string)
+        )
 
     await state.clear()
     if not fragment:
