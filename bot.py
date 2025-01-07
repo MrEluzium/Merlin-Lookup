@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+import aioschedule
 from utils import library
 from utils import database
 from utils.config_parser import *
@@ -23,8 +24,16 @@ else:
     config = read_config(CONFIG_FILE)
 
 
+async def scheduler():
+    while True:
+        await aioschedule.run_pending()
+        await asyncio.sleep(1)
+
+
 async def main(token: str) -> None:
     await database.init_pool()
+    aioschedule.every().day.at("00:00").do(database.refund_all_free_tokens)
+    asyncio.create_task(scheduler())
     dp = Dispatcher()
     dp.include_routers(
         start_router,

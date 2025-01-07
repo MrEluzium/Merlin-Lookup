@@ -343,3 +343,8 @@ async def get_book_by_id(book_id: int) -> BookSearchResult:
         sql_query = await load_sql(SQLFiles.SELECT_BOOK_BY_ID)
         row = await conn.fetchrow(sql_query, book_id)
     return BookSearchResult(*row, 1)
+
+
+async def refund_all_free_tokens():
+    async with pool.acquire() as conn:
+        await conn.execute('''UPDATE public.uchibot_users SET free_tokens = 3;''')
