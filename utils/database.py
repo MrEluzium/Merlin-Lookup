@@ -112,6 +112,8 @@ async def init_pool():
 def check_user(func: Callable):
     @wraps(func)
     async def wrapper(user: User, *args, **kwargs):
+        if user.is_bot:
+            return await func(user, *args, **kwargs)
         async with pool.acquire() as conn:
             user_exists = (await conn.fetchrow((await load_sql(SQLFiles.CHECK_USER_BY_USER_ID)), user.id))["exists"]
 
@@ -280,7 +282,7 @@ async def user_increase_paid_tokens_spent(user: User, add_tokens: int) -> int:
 
 
 @check_user
-async def add_fragment_record(user: User, book_id: int, word_list: [str], text_fragment: str) -> None:
+async def add_fragment_record(user: User, book_id: int, word_list: list[str], text_fragment: str) -> None:
     async with pool.acquire() as conn:
         sql_query = await load_sql(SQLFiles.INSERT_FRAGMENT_RECORD)
         await conn.execute(sql_query, user.id, book_id, word_list, text_fragment)

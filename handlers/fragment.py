@@ -12,7 +12,8 @@ from utils import library
 from utils.l18n import l18n
 from utils.keyboards import get_menu_keyboard, CANCEL_BUTTON
 from utils.translate import translate_words_in_text
-from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record
+from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record, get_user_data, \
+    user_decrease_free_tokens, user_decrease_paid_tokens, user_increase_paid_tokens_spent
 
 
 class FragmentSearchStateGroup(StatesGroup):
@@ -343,6 +344,24 @@ async def process_words(message: Message, state: FSMContext) -> None:
         await ask_words(message, state)
         return
 
+    user_data = await get_user_data(message.from_user)
+    total_tokens = user_data.free_tokens + user_data.paid_tokens
+    if len(clean_words) > total_tokens:
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(
+            text=l18n.get("ru", "buttons", "words_again"),
+            callback_data="ask_words")
+        )
+        builder.row(InlineKeyboardButton(
+            text=l18n.get("ru", "buttons", "cancel"),
+            callback_data="cancel")
+        )
+        await message.answer(
+            l18n.get("ru", "messages", "fragment", "lack_of_tokens"),
+            reply_markup=builder.as_markup()
+        )
+        return
+
     await state.update_data(words=clean_words)
     await search_fragment(message, state)
 
@@ -396,14 +415,29 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         )
     else:
         translated_fragment = await translate_words_in_text(fragment, data["words"])
-        await add_fragment_record(message.from_user, book.id, data["words"], translated_fragment)
-        await message.answer(
-            l18n.get("ru", "messages", "fragment", "fragment").format(
-                title=book.title,
-                author=book.author,
-                words_query=', '.join(data["words"]),
-                fragment=translated_fragment
-            ),
-            reply_markup=get_menu_keyboard(message.from_user.username),
-            link_preview_options=LinkPreviewOptions(is_disabled=True)
-        )
+
+        user_data = await get_user_data(message.from_user)
+        fragment_paid = False
+        total_tokens = user_data.free_tokens + user_data.paid_tokens
+        if len(data["words"]) <= total_tokens:
+            fragment_paid = await user_decrease_free_tokens(message.from_user, len(data["words"]))
+            if not fragment_paid:
+                await user_decrease_free_tokens(message.from_user, user_data.free_tokens)
+                paid_tokens_to_pay = len(data["words"]) - user_data.free_tokens
+                await user_increase_paid_tokens_spent(message.from_user, paid_tokens_to_pay)
+                fragment_paid = await user_decrease_paid_tokens(message.from_user, paid_tokens_to_pay)
+
+        if fragment_paid:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "fragment").format(
+                    title=book.title,
+                    author=book.author,
+                    words_query=', '.join(data["words"]),
+                    fragment=translated_fragment
+                ),
+                reply_markup=get_menu_keyboard(message.from_user.username),
+                link_preview_options=LinkPreviewOptions(is_disabled=True)
+            )
+            await add_fragment_record(message.from_user, book.id, data["words"], translated_fragment)
+        else:
+            raise Exception("Not enough tokens available on fragment search, but words was already checked.")
