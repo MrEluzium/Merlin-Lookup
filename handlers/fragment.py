@@ -13,7 +13,8 @@ from utils.l18n import l18n
 from utils.keyboards import get_menu_keyboard, CANCEL_BUTTON
 from utils.translate import translate_words_in_text
 from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record, get_user_data, \
-    user_decrease_free_tokens, user_decrease_paid_tokens, user_increase_paid_tokens_spent, BookSearchResult
+    user_decrease_free_tokens, user_decrease_paid_tokens, user_increase_paid_tokens_spent, BookSearchResult, \
+    get_book_ids_by_words_frequency
 
 
 class FragmentSearchStateGroup(StatesGroup):
@@ -57,6 +58,7 @@ async def fragment_handler(message: Message, state: FSMContext) -> None:
 
 @fragment_router.callback_query(F.data == "full_search")
 async def full_search_callback(callback_query: CallbackQuery, state: FSMContext) -> None:
+    await callback_query.answer()
     await state.update_data(full_search=True)
     await ask_words(callback_query.message, state)
 
@@ -395,7 +397,36 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
 
     data = await state.get_data()
     if data["full_search"]:
-        fragment, book = await library.process_full_search(data["words"], max_length=3096)
+        # fragment, book = await library.process_full_search(data["words"], max_length=3096)
+
+        book_ids = await get_book_ids_by_words_frequency(data["words"], 10)
+        found_fragments: list[tuple[str, dict[str, int], BookSearchResult]] = list()
+        for book_id in book_ids:
+            book = await get_book_by_id(book_id)
+            header_string = l18n.get("ru", "messages", "fragment", "fragment").format(
+                title=book.title,
+                author=book.author,
+                words_query=', '.join(data["words"]),
+                fragment=""
+            )
+            fragment, words_found = await library.process_fragment_search(
+                book.archive,
+                book.filename,
+                data["words"],
+                max_length=3549 - len(header_string)
+            )
+            if fragment:
+                found_fragments.append((fragment, words_found, book))
+        m = -1
+        best_fragment = ''
+        best_book = None
+        for fragment, words_found, book in found_fragments:
+            if sum(words_found.values()) > m and all(x > 0 for x in words_found.values()):
+                best_fragment = fragment, words_found
+                best_book = book
+                m = sum(words_found.values())
+        fragment = best_fragment
+        book = best_book
     else:
         if data["book_id"]:
             book = await get_book_by_id(data["book_id"])
