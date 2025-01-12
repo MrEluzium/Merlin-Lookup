@@ -461,14 +461,22 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
 
     await state.clear()
     if not fragment:
-        await message.answer(
-            l18n.get("ru", "messages", "fragment", "fragment_not_found").format(
-                title=book.title,
-                author=book.author,
-                words_query=', '.join(data["words"])
-            ),
-            reply_markup=get_menu_keyboard(message.from_user.username)
-        )
+        if not book:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "fragment_not_found_full").format(
+                    words_query=', '.join(data["words"])
+                ),
+                reply_markup=get_menu_keyboard(message.from_user.username)
+            )
+        else:
+            await message.answer(
+                l18n.get("ru", "messages", "fragment", "fragment_not_found").format(
+                    title=book.title,
+                    author=book.author,
+                    words_query=', '.join(data["words"])
+                ),
+                reply_markup=get_menu_keyboard(message.from_user.username)
+            )
     else:
         translated_fragment = await translate_words_in_text(fragment, data["words"])
 

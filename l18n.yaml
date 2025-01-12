@@ -39,6 +39,7 @@ ru:
       fragment_processing: "<i>Ищем отрывок...</i>"
       fragment: "<b>{author}. {title}.</b>\nОтрывок для слов: {words_query}.\n\n{fragment}\n\nБольше возможностей для изучения получайте в нашем приложении. Скачивайте на сайте merlin.su или в <a href=\"https://www.rustore.ru/catalog/app/com.nexaecommerce.merlin\">Rustore</a>"
       fragment_not_found: "Не получилось найти отрывок для слов {words_query} в книге {title} автора {author}."
+      fragment_not_found_full: "Не получилось найти отрывок для слов {words_query}."
   buttons:
     cancel: "В меню"
     start:
