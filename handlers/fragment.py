@@ -421,7 +421,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 skip_from=150000
             )
             if fragment:
-                if sum(words_found.values()) > 5 and all(x > 1 for x in words_found.values()):
+                if sum(words_found.values()) > 5 and all(x > 0 for x in words_found.values()):
                     best_fragment = fragment
                     best_book = book
                     break
