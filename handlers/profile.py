@@ -3,11 +3,11 @@ from datetime import datetime
 from functools import wraps
 from typing import Callable
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, InlineKeyboardMarkup, User, ReplyKeyboardMarkup, \
-    FSInputFile
+    FSInputFile, LabeledPrice, PreCheckoutQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import database
@@ -94,36 +94,56 @@ async def pay_callback_query(callback_query: CallbackQuery) -> None:
             ]])
     )
 
+    # config = read_config("config.ini")
+    # print(config["Bot"]["payment_token"])
     # await callback_query.message.answer_invoice(
-    #     title='Пополнение баланса токенов',
-    #     description=""
-    # )
-    # await callback_query.bot.send_invoice(
-    #     chat_id=callback.from_user.id,
-    #     title='Пополнение баланса',
-    #     description='Перевод на сумму 100 RUB',
-    #     provider_token=ukassa,  # ukassa - токен платежной системы следует добавить в файл "templates/token.py"
-    #     payload='add_balance',
-    #     currency='rub',  # валюта платежа
+    #     title='Пополнение токенов',
+    #     description='Токены для оплаты слов при поиске фрагмента',
+    #     payload='add_tokens',
+    #     currency='rub',
+    #     provider_token=config["Bot"]["payment_token"],
     #     prices=[
-    #         types.LabeledPrice(
-    #             label='Пополнить баланс на 100 руб.',
-    #             amount=10000  # пополнение на 100.00 руб. - сумма указывается в копейках
+    #         LabeledPrice(
+    #             label='Пополнить баланс на 10 токенов',
+    #             amount=10000
     #         )
     #     ],
-    #     start_parameter='SviatlanaYBot',
-    #     provider_data=None,
     #     need_name=False,
     #     need_phone_number=False,
     #     need_email=False,
     #     need_shipping_address=False,
     #     is_flexible=False,
     #     disable_notification=False,
-    #     protect_content=False,
-    #     reply_to_message_id=None,
-    #     reply_markup=None,
     #     request_timeout=60
     # )
+
+
+@profile_router.pre_checkout_query(lambda query: True)
+async def process_pre_checkout_query(pre_checkout_query: PreCheckoutQuery, bot: Bot):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+    print(pre_checkout_query)
+
+
+@profile_router.message(F.successful_payment)
+async def success_payment(message: Message):
+    tokens = message.successful_payment.total_amount // 1000
+    print(message.from_user.id, message.from_user.username)
+    await database.user_increase_paid_tokens(message.from_user, tokens)
+    await database.add_transaction_record(message.from_user, 0, tokens, "add")
+    user_data = await database.get_user_by_name(message.from_user.username)
+    await message.answer(
+        l18n.get("ru", "messages", "profile", "data").format(
+            name=message.chat.full_name,
+            free_tokens=user_data.free_tokens,
+            paid_tokens=user_data.paid_tokens
+        ),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(
+                text=l18n.get("ru", "buttons", "profile", "pay"),
+                callback_data="pay"
+            )]]
+        )
+    )
 
 
 @profile_router.callback_query(F.data == "admin_menu")

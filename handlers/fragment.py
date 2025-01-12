@@ -420,7 +420,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 max_length=3549 - len(header_string)
             )
             if fragment:
-                if all(x > 3 for x in words_found.values()):
+                if all(x > 2 for x in words_found.values()):
                     best_fragment = fragment
                     best_book = book
                     break
