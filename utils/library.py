@@ -195,7 +195,7 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
     return "\n\n".join(p["text"] for p in best_fragment), best_fragment_count
 
 
-async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096) -> tuple[str, dict[str, int]]:
+async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096, skip_from: int = 0) -> tuple[str, dict[str, int]]:
     start_time = datetime.now()
 
     try:
@@ -204,7 +204,10 @@ async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words:
         return "", {}
     else:
         paragraphs = await extract_paragraphs_from_fb2(text_file)
-        print(len(paragraphs))
+        if skip_from > 0 and len(paragraphs) > skip_from:
+            print("Skip book with too many paragraphs.")
+            await release_fb2_file(fb2_file_name)
+            return "", {}
         preprocessed = await preprocess_paragraphs(paragraphs, words)
         fragment, words_found = await find_best_fragment(preprocessed, words, max_length=max_length)
         await release_fb2_file(fb2_file_name)
