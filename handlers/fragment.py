@@ -400,7 +400,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         search_type = "full"
         # fragment, book = await library.process_full_search(data["words"], max_length=3096)
 
-        book_ids = await get_book_ids_by_words_frequency(data["words"], 15)
+        book_ids = await get_book_ids_by_words_frequency(data["words"], 20)
         found_fragments: list[tuple[str, dict[str, int], BookSearchResult]] = list()
 
         best_fragment = ''
@@ -420,7 +420,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 max_length=3549 - len(header_string)
             )
             if fragment:
-                if all(x > 2 for x in words_found.values()):
+                if sum(words_found.values()) > 5 and all(x > 1 for x in words_found.values()):
                     best_fragment = fragment
                     best_book = book
                     break
