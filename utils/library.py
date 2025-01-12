@@ -198,14 +198,18 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
 async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096) -> tuple[str, dict[str, int]]:
     start_time = datetime.now()
 
-    text_file = await get_fb2_file(zip_file_name, fb2_file_name)
-    paragraphs = await extract_paragraphs_from_fb2(text_file)
-    preprocessed = await preprocess_paragraphs(paragraphs, words)
-    fragment, words_found = await find_best_fragment(preprocessed, words, max_length=max_length)
-    await release_fb2_file(fb2_file_name)
+    try:
+        text_file = await get_fb2_file(zip_file_name, fb2_file_name)
+    except FileNotFoundError:
+        return "", {}
+    else:
+        paragraphs = await extract_paragraphs_from_fb2(text_file)
+        preprocessed = await preprocess_paragraphs(paragraphs, words)
+        fragment, words_found = await find_best_fragment(preprocessed, words, max_length=max_length)
+        await release_fb2_file(fb2_file_name)
 
-    print('Fragment search processed in {}'.format(datetime.now() - start_time))
-    return fragment, words_found
+        print('Fragment search processed in {}'.format(datetime.now() - start_time))
+        return fragment, words_found
 
 
 async def process_full_search(words: list, max_length: int = 2096) -> tuple[str, BookSearchResult]:
