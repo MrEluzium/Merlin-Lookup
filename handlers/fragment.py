@@ -4,8 +4,8 @@ from aiogram import Router, F
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, \
-    CallbackQuery, LinkPreviewOptions, InlineKeyboardMarkup
+from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardButton, ReplyKeyboardMarkup, CallbackQuery,\
+    LinkPreviewOptions
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from utils import library
@@ -14,7 +14,7 @@ from utils.keyboards import get_menu_keyboard, CANCEL_BUTTON
 from utils.translate import translate_words_in_text
 from utils.database import search_books, search_authors, get_book_by_id, add_fragment_record, get_user_data, \
     user_decrease_free_tokens, user_decrease_paid_tokens, user_increase_paid_tokens_spent, BookSearchResult, \
-    get_book_ids_by_words_frequency
+    get_book_ids_by_words_frequency, add_transaction_record
 
 
 class FragmentSearchStateGroup(StatesGroup):
@@ -397,6 +397,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
 
     data = await state.get_data()
     if data["full_search"]:
+        search_type = "full"
         # fragment, book = await library.process_full_search(data["words"], max_length=3096)
 
         book_ids = await get_book_ids_by_words_frequency(data["words"], 10)
@@ -422,12 +423,13 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         best_book = None
         for fragment, words_found, book in found_fragments:
             if sum(words_found.values()) > m and all(x > 0 for x in words_found.values()):
-                best_fragment = fragment, words_found
+                best_fragment = fragment
                 best_book = book
                 m = sum(words_found.values())
         fragment = best_fragment
         book = best_book
     else:
+        search_type = "book"
         if data["book_id"]:
             book = await get_book_by_id(data["book_id"])
         else:
@@ -471,17 +473,27 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         translated_fragment = await translate_words_in_text(fragment, data["words"])
 
         user_data = await get_user_data(message.from_user)
-        fragment_paid = False
         total_tokens = user_data.free_tokens + user_data.paid_tokens
-        if len(data["words"]) <= total_tokens:
-            fragment_paid = await user_decrease_free_tokens(message.from_user, len(data["words"]))
-            if not fragment_paid:
-                await user_decrease_free_tokens(message.from_user, user_data.free_tokens)
-                paid_tokens_to_pay = len(data["words"]) - user_data.free_tokens
-                await user_increase_paid_tokens_spent(message.from_user, paid_tokens_to_pay)
-                fragment_paid = await user_decrease_paid_tokens(message.from_user, paid_tokens_to_pay)
+        price = len(data["words"])
+        if price <= total_tokens:
+            free_tokens_to_pay = min(price, user_data.free_tokens)
+            paid_tokens_to_pay = max(0, price - free_tokens_to_pay)
 
-        if fragment_paid:
+            if paid_tokens_to_pay:
+                await user_decrease_free_tokens(message.from_user, free_tokens_to_pay)
+
+            if paid_tokens_to_pay:
+                await user_decrease_paid_tokens(message.from_user, paid_tokens_to_pay)
+                await user_increase_paid_tokens_spent(message.from_user, paid_tokens_to_pay)
+
+            transaction_id = await add_transaction_record(
+                message.from_user.id,
+                free_tokens_to_pay,
+                paid_tokens_to_pay,
+                'remove'
+            )
+            print(transaction_id)
+
             await message.answer(
                 l18n.get("ru", "messages", "fragment", "fragment").format(
                     title=book.title,
@@ -492,6 +504,8 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 reply_markup=get_menu_keyboard(message.from_user.username),
                 link_preview_options=LinkPreviewOptions(is_disabled=True)
             )
-            await add_fragment_record(message.from_user, book.id, data["words"], translated_fragment)
+
+            await add_fragment_record(message.from_user.id, book.id, data["words"], fragment, translated_fragment,
+                                      search_type, transaction_id)
         else:
             raise Exception("Not enough tokens available on fragment search, but words was already checked.")

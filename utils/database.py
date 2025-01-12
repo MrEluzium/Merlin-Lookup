@@ -1,5 +1,5 @@
 import os
-from typing import Callable
+from typing import Callable, Literal
 from functools import wraps
 from datetime import datetime, UTC
 from dataclasses import dataclass
@@ -34,6 +34,7 @@ class SQLFiles:
     DECREASE_FREE_TOKENS = "users/decrease_free_tokens.sql"
 
     INSERT_FRAGMENT_RECORD = "fragments/insert_fragment_record.sql"
+    INSERT_TRANSACTION_RECORD = "fragments/insert_transaction_record.sql"
 
     BOOKS_FUZZY_SEARCH = "library/books_fuzzy_search.sql"
     AUTHORS_FUZZY_SEARCH = "library/authors_fuzzy_search.sql"
@@ -43,6 +44,8 @@ class SQLFiles:
     SELECT_BOOK_BY_URL = "library/select_book_by_url.sql"
     SELECT_BOOKS_BY_AUTHOR = "library/select_books_by_author.sql"
     SELECT_BOOK_IDS_BY_WORDS_FREQUENCY = "library/select_book_ids_by_words_frequency.sql"
+
+    SELECT_REPORT_DATA = "select_report_data.sql"
 
 
 @dataclass
@@ -283,11 +286,18 @@ async def user_increase_paid_tokens_spent(user: User, add_tokens: int) -> int:
         return await conn.fetchval(sql_query, user.id, add_tokens)
 
 
-@check_user
-async def add_fragment_record(user: User, book_id: int, word_list: list[str], text_fragment: str) -> None:
+async def add_fragment_record(user_id: int, book_id: int, word_list: list[str], raw_text_fragment: str,
+                              text_fragment: str, search_type: Literal['full', 'book'], transaction_id: int) -> None:
     async with pool.acquire() as conn:
         sql_query = await load_sql(SQLFiles.INSERT_FRAGMENT_RECORD)
-        await conn.execute(sql_query, user.id, book_id, word_list, text_fragment)
+        await conn.execute(sql_query, user_id, book_id, word_list, raw_text_fragment, text_fragment, search_type, transaction_id)
+
+
+async def add_transaction_record(user_id: int, free_amount: int, paid_amount: int,
+                                 transaction_type: Literal['add', 'remove']) -> int:
+    async with pool.acquire() as conn:
+        sql_query = await load_sql(SQLFiles.INSERT_TRANSACTION_RECORD)
+        return await conn.fetchval(sql_query, user_id, free_amount, paid_amount, transaction_type)
 
 
 async def search_books(title: str = None, author_name: str = None) -> list[BookSearchResult] | None:
@@ -359,6 +369,12 @@ async def get_book_ids_by_words_frequency(word_list: list[str], limit: int = 1) 
         sql_query = await load_sql(SQLFiles.SELECT_BOOK_IDS_BY_WORDS_FREQUENCY)
         rows = await conn.fetch(sql_query, word_list, limit)
     return [x["book_id"] for x in rows]
+
+
+async def get_report_data(start_date: datetime, end_date: datetime):
+    async with pool.acquire() as conn:
+        query = await load_sql(SQLFiles.SELECT_REPORT_DATA)
+        return await conn.fetch(query, start_date, end_date)
 
 
 async def refund_all_free_tokens():

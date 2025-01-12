@@ -1,6 +1,7 @@
 .venv
 .idea
 .cache/
+.reports_cache/
 __pycache__/
 config.ini
 

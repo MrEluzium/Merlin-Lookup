@@ -27,12 +27,12 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
         callback_data="user_lookup")
     )
     builder.row(InlineKeyboardButton(
-        text=l18n.get("ru", "buttons", "admin", "add_admin"),
-        callback_data="add_admin")
+        text=l18n.get("ru", "buttons", "admin", "admins"),
+        callback_data="admins")
     )
     builder.row(InlineKeyboardButton(
-        text=l18n.get("ru", "buttons", "admin", "remove_admin"),
-        callback_data="remove_admin")
+        text=l18n.get("ru", "buttons", "admin", "get_report"),
+        callback_data="get_report")
     )
     # builder.row(InlineKeyboardButton(
     #     text=l18n.get("ru", "buttons", "cancel"),
