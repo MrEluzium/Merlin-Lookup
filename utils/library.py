@@ -200,11 +200,11 @@ async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words:
 
     try:
         text_file = await get_fb2_file(zip_file_name, fb2_file_name)
-        print(len(text_file))
     except FileNotFoundError:
         return "", {}
     else:
         paragraphs = await extract_paragraphs_from_fb2(text_file)
+        print(len(paragraphs))
         preprocessed = await preprocess_paragraphs(paragraphs, words)
         fragment, words_found = await find_best_fragment(preprocessed, words, max_length=max_length)
         await release_fb2_file(fb2_file_name)
