@@ -200,6 +200,7 @@ async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words:
 
     try:
         text_file = await get_fb2_file(zip_file_name, fb2_file_name)
+        print(len(text_file))
     except FileNotFoundError:
         return "", {}
     else:
