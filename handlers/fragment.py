@@ -400,8 +400,11 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         search_type = "full"
         # fragment, book = await library.process_full_search(data["words"], max_length=3096)
 
-        book_ids = await get_book_ids_by_words_frequency(data["words"], 10)
+        book_ids = await get_book_ids_by_words_frequency(data["words"], 15)
         found_fragments: list[tuple[str, dict[str, int], BookSearchResult]] = list()
+
+        best_fragment = ''
+        best_book = None
         for book_id in book_ids:
             book = await get_book_by_id(book_id)
             header_string = l18n.get("ru", "messages", "fragment", "fragment").format(
@@ -417,15 +420,19 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 max_length=3549 - len(header_string)
             )
             if fragment:
+                if all(x > 3 for x in words_found.values()):
+                    best_fragment = fragment
+                    best_book = book
+                    break
                 found_fragments.append((fragment, words_found, book))
-        m = -1
-        best_fragment = ''
-        best_book = None
-        for fragment, words_found, book in found_fragments:
-            if sum(words_found.values()) > m and all(x > 0 for x in words_found.values()):
-                best_fragment = fragment
-                best_book = book
-                m = sum(words_found.values())
+
+        if not best_fragment:
+            m = -1
+            for fragment, words_found, book in found_fragments:
+                if sum(words_found.values()) > m and all(x > 0 for x in words_found.values()):
+                    best_fragment = fragment
+                    best_book = book
+                    m = sum(words_found.values())
         fragment = best_fragment
         book = best_book
     else:
