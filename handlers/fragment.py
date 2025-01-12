@@ -353,7 +353,7 @@ async def process_words(message: Message, state: FSMContext) -> None:
     words = message.text.split(" ")
     clean_words = []
     for word in words:
-        clean_word = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', word)
+        clean_word = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', word).lower()
         if clean_word.isalpha():
             clean_words.append(clean_word)
 
@@ -500,7 +500,6 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 paid_tokens_to_pay,
                 'remove'
             )
-            print(transaction_id)
 
             await message.answer(
                 l18n.get("ru", "messages", "fragment", "fragment").format(
