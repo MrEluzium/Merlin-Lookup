@@ -417,8 +417,7 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
                 book.archive,
                 book.filename,
                 data["words"],
-                max_length=3549 - len(header_string),
-                skip_from=150000
+                max_length=3549 - len(header_string)
             )
             if fragment:
                 if sum(words_found.values()) > 5 and all(x > 0 for x in words_found.values()):
