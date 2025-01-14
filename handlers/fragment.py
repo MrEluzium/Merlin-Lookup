@@ -350,14 +350,14 @@ async def ask_words(message: Message, state: FSMContext) -> None:
 
 @fragment_router.message(FragmentSearchStateGroup.ask_words)
 async def process_words(message: Message, state: FSMContext) -> None:
-    words = message.text.split(" ")
+    words = message.text.split(",")
     clean_words = []
     for word in words:
         clean_word = re.sub(r'[^a-zA-Zа-яА-ЯёЁ]', '', word).lower()
         if clean_word.isalpha():
             clean_words.append(clean_word)
 
-    if len(clean_words) not in range(1, 4):
+    if len(clean_words) not in range(1, 4) or len(clean_words) != message.text.count(' ') + 1:
         await message.answer(
             l18n.get("ru", "messages", "fragment", "words_wrong_format"),
             reply_markup=ReplyKeyboardRemove()

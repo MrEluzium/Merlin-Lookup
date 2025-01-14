@@ -128,7 +128,11 @@ async def extract_paragraphs_from_fb2(file_path):
         async with aiofiles.open(file_path, 'r', encoding=detector.result['encoding']) as file:
             content = await file.read()
 
-    tree = ET.ElementTree(ET.fromstring(content))
+    try:
+        tree = ET.ElementTree(ET.fromstring(content))
+    except ET.ParseError:
+        print(f"{file_path} could not be parsed.")
+        return list()
     root = tree.getroot()
 
     namespaces = {'fb': 'http://www.gribuser.ru/xml/fictionbook/2.0'}
@@ -158,7 +162,7 @@ async def preprocess_paragraphs(paragraphs, words):
 
 
 async def find_best_fragment(preprocessed, words, min_length=512, max_length=2096):
-    """Find the best fragment starting from a paragraph containing target words, and cut paragraphs without specified words from start and end."""
+    """Find the best fragment with the highest balanced presence of all target words."""
     best_fragment = []
     best_score = -1
     best_fragment_count = {}
@@ -182,8 +186,10 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
                 current_counts[word] += para_data["counts"][word]
 
             if current_length >= min_length and all(current_counts[word] > 0 for word in words):
-                score = sum(current_counts.values()) - (end_idx - start_idx) * 0.1
+                # Calculate the score as the minimum count of any word to favor balance
+                score = min(current_counts.values())
 
+                # Update the best fragment if this one has a higher score
                 if score > best_score:
                     best_score = score
                     best_fragment = current_fragment.copy()
@@ -193,6 +199,7 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
         return "", {word: 0 for word in words}
 
     return "\n\n".join(p["text"] for p in best_fragment), best_fragment_count
+
 
 
 async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words: list, max_length: int = 2096, skip_from: int = 0) -> tuple[str, dict[str, int]]:
@@ -208,23 +215,11 @@ async def process_fragment_search(zip_file_name: str, fb2_file_name: str, words:
             print("Skip book with too many paragraphs.")
             await release_fb2_file(fb2_file_name)
             return "", {}
+        if not paragraphs:
+            return "", {}
         preprocessed = await preprocess_paragraphs(paragraphs, words)
         fragment, words_found = await find_best_fragment(preprocessed, words, max_length=max_length)
         await release_fb2_file(fb2_file_name)
 
         print('Fragment search processed in {}'.format(datetime.now() - start_time))
         return fragment, words_found
-
-
-async def process_full_search(words: list, max_length: int = 2096) -> tuple[str, BookSearchResult]:
-    library_dir = read_config('config.ini')['Library']['library_root']
-    async for zip_name, file_name in yield_zip_file_names(library_dir):
-        print(f'Processing {file_name} from {zip_name}...')
-        fragment, words_found = await process_fragment_search(zip_name, file_name, words, max_length=3096)
-        print(words_found)
-        if len(words_found) != len(words) or any(n < 1 for n in words_found.values()):
-            continue
-
-        url = "fb2.Flibusta.Net/" + zip_name + "/" + file_name
-        book = await get_book_by_url(url)
-        return fragment, book
