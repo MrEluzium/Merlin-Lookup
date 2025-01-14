@@ -150,49 +150,92 @@ async def preprocess_paragraph(paragraph, word_patterns):
 async def preprocess_paragraphs(paragraphs, words):
     """Preprocess paragraphs asynchronously."""
     word_patterns = {
-        word: re.compile(rf'(?<![а-яёa-z]){word}(?![а-яёa-z])', re.IGNORECASE)
+        word: re.compile(rf'(?<![а-яёa-z]){word}(?![а-яёa-z])', re.IGNORECASE | re.MULTILINE)
         for word in words
     }
 
-    tasks = []
-    for paragraph in paragraphs:
-        tasks.append(preprocess_paragraph(paragraph, word_patterns))
+    chunk_size = 1000
+    chunks = [paragraphs[i:i + chunk_size] for i in range(0, len(paragraphs), chunk_size)]
 
-    return await asyncio.gather(*tasks)
+    async def process_chunk(chunk):
+        return [await preprocess_paragraph(p, word_patterns) for p in chunk]
+
+    tasks = [process_chunk(chunk) for chunk in chunks]
+    results = await asyncio.gather(*tasks)
+
+    return [item for chunk in results for item in chunk]
+
+
+async def quick_feasibility_check(preprocessed, words):
+    """
+    Quickly check if it's possible to find a fragment containing all words.
+    Returns False if definitely impossible, True if might be possible.
+    """
+    # Create a set of words that appear at least once
+    found_words = set()
+    for para in preprocessed:
+        for word, count in para["counts"].items():
+            if count > 0:
+                found_words.add(word)
+        if len(found_words) == len(words):
+            return True
+    return False
+
+
+async def find_word_positions(preprocessed, words):
+    """
+    Create an index of positions where each word appears.
+    Returns a dict of {word: [positions]} where positions are paragraph indices.
+    """
+    word_positions = {word: [] for word in words}
+    for i, para in enumerate(preprocessed):
+        for word in words:
+            if para["counts"][word] > 0:
+                word_positions[word].append(i)
+    return word_positions
 
 
 async def find_best_fragment(preprocessed, words, min_length=512, max_length=2096):
     """Find the best fragment with the highest balanced presence of all target words."""
+    if not await quick_feasibility_check(preprocessed, words):
+        return "", {word: 0 for word in words}
+
+    word_positions = await find_word_positions(preprocessed, words)
+
+    all_positions = []
+    for positions in word_positions.values():
+        all_positions.extend((pos, word) for pos, word in zip(positions, [word] * len(positions)))
+    all_positions.sort()
+
     best_fragment = []
     best_score = -1
-    best_fragment_count = {}
+    best_fragment_count = {word: 0 for word in words}
 
-    for start_idx in range(len(preprocessed)):
-        current_length = 0
-        current_fragment = []
-        current_counts = {word: 0 for word in words}
+    left = 0
+    current_counts = {word: 0 for word in words}
 
-        for end_idx in range(start_idx, len(preprocessed)):
-            para_data = preprocessed[end_idx]
-            new_length = current_length + para_data["length"]
+    for right in range(len(all_positions)):
+        pos, word = all_positions[right]
+        current_counts[word] += preprocessed[pos]["counts"][word]
 
-            if new_length > max_length:
+        while left < right:
+            left_pos, left_word = all_positions[left]
+            if current_counts[left_word] - preprocessed[left_pos]["counts"][left_word] > 0:
+                current_counts[left_word] -= preprocessed[left_pos]["counts"][left_word]
+                left += 1
+            else:
                 break
 
-            current_length = new_length
-            current_fragment.append(para_data)
+        if all(count > 0 for count in current_counts.values()):
+            start_pos = all_positions[left][0]
+            end_pos = pos
+            length = sum(para["length"] for para in preprocessed[start_pos:end_pos + 1])
 
-            for word in words:
-                current_counts[word] += para_data["counts"][word]
-
-            if current_length >= min_length and all(current_counts[word] > 0 for word in words):
-                # Calculate the score as the minimum count of any word to favor balance
+            if min_length <= length <= max_length:
                 score = min(current_counts.values())
-
-                # Update the best fragment if this one has a higher score
                 if score > best_score:
                     best_score = score
-                    best_fragment = current_fragment.copy()
+                    best_fragment = preprocessed[start_pos:end_pos + 1]
                     best_fragment_count = current_counts.copy()
 
     if not best_fragment:
