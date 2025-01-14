@@ -200,17 +200,23 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
     if not await quick_feasibility_check(preprocessed, words):
         return "", {word: 0 for word in words}
 
+    # Get word positions
     word_positions = await find_word_positions(preprocessed, words)
 
+    # Find the minimum window that contains all words
     all_positions = []
-    for positions in word_positions.values():
-        all_positions.extend((pos, word) for pos, word in zip(positions, [word] * len(positions)))
-    all_positions.sort()
+    for word, positions in word_positions.items():
+        all_positions.extend((pos, word) for pos in positions)
+    all_positions.sort(key=lambda x: x[0])  # Sort by position
+
+    if not all_positions:
+        return "", {word: 0 for word in words}
 
     best_fragment = []
     best_score = -1
     best_fragment_count = {word: 0 for word in words}
 
+    # Use sliding window approach
     left = 0
     current_counts = {word: 0 for word in words}
 
@@ -218,6 +224,7 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
         pos, word = all_positions[right]
         current_counts[word] += preprocessed[pos]["counts"][word]
 
+        # Try to minimize the window while maintaining all words
         while left < right:
             left_pos, left_word = all_positions[left]
             if current_counts[left_word] - preprocessed[left_pos]["counts"][left_word] > 0:
@@ -226,7 +233,9 @@ async def find_best_fragment(preprocessed, words, min_length=512, max_length=209
             else:
                 break
 
+        # Check if we have a valid window
         if all(count > 0 for count in current_counts.values()):
+            # Calculate fragment length
             start_pos = all_positions[left][0]
             end_pos = pos
             length = sum(para["length"] for para in preprocessed[start_pos:end_pos + 1])
