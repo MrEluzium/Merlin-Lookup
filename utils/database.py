@@ -364,10 +364,10 @@ async def get_book_by_url(url: str) -> BookSearchResult:
     return BookSearchResult(*row, 1)
 
 
-async def get_book_ids_by_words_frequency(word_list: list[str], limit: int = 1) -> list[int]:
+async def get_book_ids_by_words_frequency(word_list: list[str], min_frequency: int = 20) -> list[int]:
     async with pool.acquire() as conn:
         sql_query = await load_sql(SQLFiles.SELECT_BOOK_IDS_BY_WORDS_FREQUENCY)
-        rows = await conn.fetch(sql_query, word_list, limit)
+        rows = await conn.fetch(sql_query, word_list, min_frequency)
     return [x["book_id"] for x in rows]
 
 
