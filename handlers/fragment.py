@@ -1,3 +1,4 @@
+import random
 import re
 
 from aiogram import Router, F
@@ -401,8 +402,9 @@ async def search_fragment(message: Message, state: FSMContext) -> None:
         # fragment, book = await library.process_full_search(data["words"], max_length=3096)
 
         book_ids = await get_book_ids_by_words_frequency(data["words"], 20)
-        found_fragments: list[tuple[str, dict[str, int], BookSearchResult]] = list()
+        random.shuffle(book_ids)
 
+        found_fragments: list[tuple[str, dict[str, int], BookSearchResult]] = list()
         best_fragment = ''
         best_book = None
         for book_id in book_ids:
